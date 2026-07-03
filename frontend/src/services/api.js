@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api', // Adjust this if your backend URL is different
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 export default api;
