@@ -3,6 +3,7 @@
 require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const { Queue } = require('bullmq');
 const IORedis = require('ioredis');
@@ -15,6 +16,11 @@ const config = require('./config');
 // Initialize Express app
 const app = express();
 app.use(helmet());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  methods: ['GET', 'POST'],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
