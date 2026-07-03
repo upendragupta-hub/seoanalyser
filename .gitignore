@@ -1,0 +1,42 @@
+# Environment variables
+.env
+.env.local
+.env.*
+
+# Node modules
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build folders
+dist/
+build/
+
+# Cache
+.cache/
+.next/
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Redis
+redis/dump.rdb
+redis/appendonly.aof
+
+# Coverage
+coverage/
+
+# Optional lock files (agar ignore karna ho)
+# package-lock.json
+# yarn.lock
