@@ -28,7 +28,7 @@ mongoose
   });
 
 // Initialize Redis connection for BullMQ
-const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
+const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null, tls: {} });
 const seoQueue = new Queue('seoQueue', { connection });
 // Make queue accessible via app locals
 app.locals.seoQueue = seoQueue;

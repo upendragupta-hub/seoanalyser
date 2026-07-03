@@ -18,7 +18,7 @@ mongoose
   });
 
 // Create a Redis connection (same as in server)
-const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null });
+const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null, tls: {} });
 
 const worker = new Worker(
   'seoQueue',
