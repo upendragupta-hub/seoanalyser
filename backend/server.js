@@ -16,22 +16,34 @@ const config = require('./config');
 // Initialize Express app
 const app = express();
 app.use(helmet());
-const allowedOrigins = [
+const allowedOrigins = new Set([
   'http://localhost:5173',
   'http://localhost:4173',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+  ...(process.env.FRONTEND_URL || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+]);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === 'https:' && /^seoanalyser-[a-z0-9-]+\.vercel\.app$/.test(hostname);
+  } catch (err) {
+    return false;
+  }
+}
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g., curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin ${origin} not allowed`));
     }
   },
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true,
 }));
 app.use(express.json());
