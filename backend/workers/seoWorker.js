@@ -8,14 +8,26 @@ const logger = require('../utils/logger');
 const { analyzeUrl } = require('../services/seoService');
 const AnalysisResult = require('../models/AnalysisResult');
 
-// Connect to MongoDB
-mongoose
-  .connect(config.MONGODB_URI)
-  .then(() => logger.info('Worker MongoDB connected'))
-  .catch((err) => {
-    logger.error('Worker MongoDB connection error:', err);
-    process.exit(1);
-  });
+function ensureMongoConnection() {
+  if (mongoose.connection.readyState === 1) {
+    logger.info('Worker using existing MongoDB connection');
+    return Promise.resolve();
+  }
+
+  if (mongoose.connection.readyState === 2) {
+    logger.info('Worker waiting for MongoDB connection');
+    return mongoose.connection.asPromise();
+  }
+
+  return mongoose
+    .connect(config.MONGODB_URI)
+    .then(() => logger.info('Worker MongoDB connected'));
+}
+
+const mongoReady = ensureMongoConnection().catch((err) => {
+  logger.error('Worker MongoDB connection error:', err);
+  process.exit(1);
+});
 
 // Create a Redis connection (same as in server)
 const connection = new IORedis(config.REDIS_URL, config.REDIS_OPTIONS);
@@ -23,6 +35,8 @@ const connection = new IORedis(config.REDIS_URL, config.REDIS_OPTIONS);
 const worker = new Worker(
   'seoQueue',
   async (job) => {
+    await mongoReady;
+
     const { analysisId, url } = job.data;
     logger.info(`Processing SEO job ${job.id} for URL ${url}`);
     try {

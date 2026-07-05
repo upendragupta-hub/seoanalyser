@@ -64,6 +64,11 @@ const seoQueue = new Queue('seoQueue', { connection });
 // Make queue accessible via app locals
 app.locals.seoQueue = seoQueue;
 
+if (process.env.START_WORKER === 'true') {
+  require('./workers/seoWorker');
+  logger.info('SEO worker started in server process');
+}
+
 // Register routes
 app.use('/api/analyze', analyzeRoutes);
 app.use('/api/results', resultsRoutes);
