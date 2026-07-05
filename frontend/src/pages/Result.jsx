@@ -40,7 +40,11 @@ function Result() {
       } catch (err) {
         console.error('Error fetching result:', err);
         const status = err.response?.status;
-        setError(status === 400 ? 'The analysis ID was invalid. Please try again.' : 'Failed to fetch results.');
+        if (status === 404) {
+          setError('The analysis is still being prepared or the result is not available yet. Please try again in a moment.');
+        } else {
+          setError(status === 400 ? 'The analysis ID was invalid. Please try again.' : 'Failed to fetch results.');
+        }
         setLoading(false);
         if (intervalId) clearInterval(intervalId);
       }
