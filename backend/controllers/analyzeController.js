@@ -32,7 +32,7 @@ async function submitUrl(req, res, next) {
     const { url } = req.body;
 
     // Create a pending document – results will be filled by the worker later
-    const placeholder = new AnalysisResult({ url });
+    const placeholder = new AnalysisResult({ url, status: 'pending' });
     await placeholder.save();
 
     const queue = req.app.locals.seoQueue;
@@ -40,6 +40,9 @@ async function submitUrl(req, res, next) {
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
     });
+
+    placeholder.status = 'processing';
+    await placeholder.save();
 
     logger.info(`Enqueued SEO job ${job.id} for URL ${url}`);
     res.status(202).json({ jobId: placeholder._id, status: 'queued' });

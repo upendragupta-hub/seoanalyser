@@ -17,11 +17,19 @@ async function analyzeUrl(targetUrl) {
 
   // 1️⃣ Fetch raw HTML using Puppeteer (handles JS-rendered pages)
   const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-  const page = await browser.newPage();
-  await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-  const html = await page.content();
-  const finalUrl = page.url(); // after redirects
-  await browser.close();
+  let html;
+  let finalUrl;
+  let redirects = [];
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    html = await page.content();
+    finalUrl = page.url(); // after redirects
+    redirects = page.redirectChain ? page.redirectChain().map((r) => r.url()) : [];
+  } finally {
+    await browser.close();
+  }
 
   const $ = cheerio.load(html);
 
@@ -65,7 +73,6 @@ async function analyzeUrl(targetUrl) {
       .catch(() => null),
   ]);
   const canonical = $('link[rel="canonical"]').attr('href') || '';
-  const redirects = page.redirectChain ? page.redirectChain() : [];
   const indexable = !robotsResp || !/noindex/.test(robotsResp);
   const structuredData = [];
   $('[type="application/ld+json"]').each((_, el) => {
@@ -119,7 +126,7 @@ async function analyzeUrl(targetUrl) {
       robotsTxt: robotsResp !== null,
       sitemapXml: sitemapResp !== null,
       canonical,
-      redirects: redirects.map((r) => r.url()),
+      redirects,
       indexable,
       structuredDataCount: structuredData.length,
     },
@@ -158,20 +165,22 @@ async function analyzeUrl(targetUrl) {
  */
 async function runLighthouse(url) {
   const chrome = await puppeteer.launch({ args: ['--no-sandbox', '--headless'] });
-  const { port } = new URL(chrome.wsEndpoint());
-  
-  // Dynamically import lighthouse (ESM)
-  const lh = await import('lighthouse');
-  const lighthouseFn = lh.default || lh;
-  
-  const result = await lighthouseFn(url, {
-    port: Number(port),
-    output: 'json',
-    logLevel: 'error',
-    onlyCategories: ['performance'],
-  });
-  await chrome.close();
-  return result;
+  try {
+    const { port } = new URL(chrome.wsEndpoint());
+
+    // Dynamically import lighthouse (ESM)
+    const lh = await import('lighthouse');
+    const lighthouseFn = lh.default || lh;
+
+    return await lighthouseFn(url, {
+      port: Number(port),
+      output: 'json',
+      logLevel: 'error',
+      onlyCategories: ['performance'],
+    });
+  } finally {
+    await chrome.close();
+  }
 }
 
 /**

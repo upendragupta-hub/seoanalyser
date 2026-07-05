@@ -2,6 +2,7 @@
 
 const AnalysisResult = require('../models/AnalysisResult');
 const logger = require('../utils/logger');
+const mongoose = require('mongoose');
 
 /**
  * GET /api/results/:id
@@ -10,20 +11,24 @@ const logger = require('../utils/logger');
 async function getResult(req, res, next) {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid analysis id' });
+    }
+
     const doc = await AnalysisResult.findById(id).lean();
     if (!doc) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    // Determine status based on whether scores have been populated
-    const isCompleted =
-      typeof doc.overallScore === 'number' && doc.overallScore > 0;
-
     const response = {
-      status: isCompleted ? 'completed' : 'processing',
+      status: doc.status || 'processing',
     };
 
-    if (isCompleted) {
+    if (doc.status === 'failed') {
+      response.error = doc.errorMessage || 'Analysis failed';
+    }
+
+    if (doc.status === 'completed') {
       response.report = {
         url: doc.url,
         technicalScore: doc.technicalScore,

@@ -18,7 +18,7 @@ mongoose
   });
 
 // Create a Redis connection (same as in server)
-const connection = new IORedis(config.REDIS_URL, { maxRetriesPerRequest: null, tls: {} });
+const connection = new IORedis(config.REDIS_URL, config.REDIS_OPTIONS);
 
 const worker = new Worker(
   'seoQueue',
@@ -30,12 +30,17 @@ const worker = new Worker(
 
       // Update the existing document with full report and scores
       await AnalysisResult.findByIdAndUpdate(analysisId, {
+        status: 'completed',
+        errorMessage: '',
         ...report,
       });
 
       logger.info(`SEO job ${job.id} completed`);
     } catch (err) {
       logger.error(`SEO job ${job.id} failed: ${err.message}`);
+      await AnalysisResult.findByIdAndUpdate(analysisId, {
+        errorMessage: err.message,
+      });
       // Re‑throw to let BullMQ capture the failure (will be retried per job options)
       throw err;
     }
@@ -47,11 +52,22 @@ worker.on('completed', (job) => {
   logger.info(`Job ${job.id} completed successfully`);
 });
 
-worker.on('failed', (job, err) => {
+worker.on('failed', async (job, err) => {
   logger.error(`Job ${job.id} failed with error: ${err.message}`);
+  await AnalysisResult.findByIdAndUpdate(job.data.analysisId, {
+    status: 'failed',
+    errorMessage: err.message,
+  });
 });
 
 process.on('SIGINT', async () => {
+  await worker.close();
+  await connection.quit();
+  logger.info('Worker shut down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
   await worker.close();
   await connection.quit();
   logger.info('Worker shut down gracefully');
