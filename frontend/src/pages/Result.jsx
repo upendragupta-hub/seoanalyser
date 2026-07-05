@@ -11,6 +11,12 @@ function Result() {
   useEffect(() => {
     let intervalId;
 
+    if (!jobId) {
+      setError('Missing analysis ID. Please try again.');
+      setLoading(false);
+      return undefined;
+    }
+
     const fetchResult = async () => {
       try {
         const response = await api.get(`/results/${jobId}`);
@@ -33,7 +39,8 @@ function Result() {
         // If processing, keep loading and polling
       } catch (err) {
         console.error('Error fetching result:', err);
-        setError('Failed to fetch results.');
+        const status = err.response?.status;
+        setError(status === 400 ? 'The analysis ID was invalid. Please try again.' : 'Failed to fetch results.');
         setLoading(false);
         if (intervalId) clearInterval(intervalId);
       }
