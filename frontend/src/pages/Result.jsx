@@ -26,7 +26,7 @@ function Result() {
           setLoading(false);
           clearInterval(intervalId);
         } else if (data.status === 'failed' || data.status === 'error') {
-          setError('Analysis failed.');
+          setError(data.error || 'Analysis failed.');
           setLoading(false);
           clearInterval(intervalId);
         }

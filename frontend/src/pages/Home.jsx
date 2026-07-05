@@ -6,15 +6,20 @@ import api from '../services/api';
 function Home() {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
+
     setError('');
     if (!url.trim()) {
       setError('Please enter a URL');
       return;
     }
+
+    setSubmitting(true);
     try {
       const response = await api.post('/analyze', { url });
       const { jobId } = response.data;
@@ -22,6 +27,8 @@ function Home() {
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.errors?.[0]?.msg || 'Failed to submit URL');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -41,9 +48,10 @@ function Home() {
           {error && <p className="text-sm text-red-400">{error}</p>}
           <button
             type="submit"
-            className="w-full rounded bg-primary py-2 font-semibold text-white transition-colors hover:bg-primary/80"
+            disabled={submitting}
+            className="w-full rounded bg-primary py-2 font-semibold text-white transition-colors hover:bg-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Analyze
+            {submitting ? 'Analyzing...' : 'Analyze'}
           </button>
         </form>
       </div>
