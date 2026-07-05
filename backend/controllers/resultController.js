@@ -11,7 +11,10 @@ const { getAnalysisResult } = require('../utils/localStore');
 async function getResult(req, res, next) {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    const isMongoId = mongoose.Types.ObjectId.isValid(id);
+    const isLocalId = typeof id === 'string' && /^[A-Za-z0-9._:-]+$/.test(id);
+
+    if (!id || (!isMongoId && !isLocalId)) {
       return res.status(400).json({ error: 'Invalid analysis id' });
     }
 

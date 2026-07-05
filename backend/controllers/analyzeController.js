@@ -2,7 +2,7 @@
 
 const { body, validationResult } = require('express-validator');
 const logger = require('../utils/logger');
-const { createAnalysisResult } = require('../utils/localStore');
+const { createAnalysisResult, updateAnalysisResult } = require('../utils/localStore');
 
 /**
  * Validate the incoming request body – it must contain a valid URL string.
@@ -39,8 +39,7 @@ async function submitUrl(req, res, next) {
       backoff: { type: 'exponential', delay: 5000 },
     });
 
-    await createAnalysisResult({
-      _id: placeholder._id,
+    await updateAnalysisResult(placeholder._id, {
       url,
       status: 'processing',
     });
