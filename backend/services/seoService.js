@@ -83,8 +83,7 @@ async function analyzeUrl(targetUrl) {
   });
 
   // ---------- Performance (Lighthouse) ----------
-  const lhResult = await runLighthouse(finalUrl);
-  const lhAudits = lhResult.lhr;
+  const performance = await getPerformanceMetrics(finalUrl);
 
   // ---------- Content Analysis ----------
   const textContent = $('body').text().replace(/\s+/g, ' ').trim();
@@ -130,13 +129,7 @@ async function analyzeUrl(targetUrl) {
       indexable,
       structuredDataCount: structuredData.length,
     },
-    performance: {
-      performanceScore: lhAudits.categories.performance.score * 100,
-      lcp: lhAudits.audits['largest-contentful-paint'].numericValue,
-      fcp: lhAudits.audits['first-contentful-paint'].numericValue,
-      cls: lhAudits.audits['cumulative-layout-shift'].numericValue,
-      tbt: lhAudits.audits['total-blocking-time'].numericValue,
-    },
+    performance,
     content: {
       contentLength,
       wordCount,
@@ -180,6 +173,31 @@ async function runLighthouse(url) {
     });
   } finally {
     await chrome.close();
+  }
+}
+
+async function getPerformanceMetrics(url) {
+  try {
+    const lhResult = await runLighthouse(url);
+    const lhAudits = lhResult.lhr;
+
+    return {
+      performanceScore: lhAudits.categories.performance.score * 100,
+      lcp: lhAudits.audits['largest-contentful-paint'].numericValue,
+      fcp: lhAudits.audits['first-contentful-paint'].numericValue,
+      cls: lhAudits.audits['cumulative-layout-shift'].numericValue,
+      tbt: lhAudits.audits['total-blocking-time'].numericValue,
+    };
+  } catch (err) {
+    logger.error(`Lighthouse failed for ${url}: ${err.message}`);
+    return {
+      performanceScore: 0,
+      lcp: null,
+      fcp: null,
+      cls: null,
+      tbt: null,
+      error: err.message,
+    };
   }
 }
 

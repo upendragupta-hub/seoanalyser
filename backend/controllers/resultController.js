@@ -1,8 +1,8 @@
 // backend/controllers/resultController.js
 
-const AnalysisResult = require('../models/AnalysisResult');
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
+const { getAnalysisResult } = require('../utils/localStore');
 
 /**
  * GET /api/results/:id
@@ -15,7 +15,7 @@ async function getResult(req, res, next) {
       return res.status(400).json({ error: 'Invalid analysis id' });
     }
 
-    const doc = await AnalysisResult.findById(id).lean();
+    const doc = await getAnalysisResult(id);
     if (!doc) {
       return res.status(404).json({ error: 'Analysis not found' });
     }

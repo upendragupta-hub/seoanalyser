@@ -2,7 +2,7 @@
 
 const { body, validationResult } = require('express-validator');
 const logger = require('../utils/logger');
-const AnalysisResult = require('../models/AnalysisResult');
+const { createAnalysisResult } = require('../utils/localStore');
 
 /**
  * Validate the incoming request body – it must contain a valid URL string.
@@ -31,9 +31,7 @@ async function submitUrl(req, res, next) {
 
     const { url } = req.body;
 
-    // Create a pending document – results will be filled by the worker later
-    const placeholder = new AnalysisResult({ url, status: 'pending' });
-    await placeholder.save();
+    const placeholder = await createAnalysisResult({ url, status: 'pending' });
 
     const queue = req.app.locals.seoQueue;
     const job = await queue.add('seoJob', { analysisId: placeholder._id, url }, {
@@ -41,8 +39,11 @@ async function submitUrl(req, res, next) {
       backoff: { type: 'exponential', delay: 5000 },
     });
 
-    placeholder.status = 'processing';
-    await placeholder.save();
+    await createAnalysisResult({
+      _id: placeholder._id,
+      url,
+      status: 'processing',
+    });
 
     logger.info(`Enqueued SEO job ${job.id} for URL ${url}`);
     res.status(202).json({ jobId: placeholder._id, status: 'queued' });

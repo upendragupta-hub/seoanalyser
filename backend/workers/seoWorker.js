@@ -59,7 +59,7 @@ const worker = new Worker(
       throw err;
     }
   },
-  { connection, concurrency: 2 }
+  { connection, concurrency: 1 }
 );
 
 worker.on('completed', (job) => {
