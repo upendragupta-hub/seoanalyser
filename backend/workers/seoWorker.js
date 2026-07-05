@@ -7,30 +7,54 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const { analyzeUrl } = require('../services/seoService');
 const AnalysisResult = require('../models/AnalysisResult');
+const { updateAnalysisResult } = require('../utils/localStore');
 
-function ensureMongoConnection() {
+async function ensureMongoConnection() {
   if (mongoose.connection.readyState === 1) {
     logger.info('Worker using existing MongoDB connection');
-    return Promise.resolve();
+    return true;
   }
 
   if (mongoose.connection.readyState === 2) {
     logger.info('Worker waiting for MongoDB connection');
-    return mongoose.connection.asPromise();
+    try {
+      await mongoose.connection.asPromise();
+      logger.info('Worker MongoDB connected');
+      return true;
+    } catch (err) {
+      logger.warn(`Worker MongoDB unavailable, using local fallback: ${err.message}`);
+      return false;
+    }
   }
 
-  return mongoose
-    .connect(config.MONGODB_URI)
-    .then(() => logger.info('Worker MongoDB connected'));
+  try {
+    await mongoose.connect(config.MONGODB_URI);
+    logger.info('Worker MongoDB connected');
+    return true;
+  } catch (err) {
+    logger.warn(`Worker MongoDB unavailable, using local fallback: ${err.message}`);
+    return false;
+  }
 }
 
-const mongoReady = ensureMongoConnection().catch((err) => {
-  logger.error('Worker MongoDB connection error:', err);
-  process.exit(1);
-});
+const mongoReady = ensureMongoConnection();
 
 // Create a Redis connection (same as in server)
 const connection = new IORedis(config.REDIS_URL, config.REDIS_OPTIONS);
+
+async function persistResult(analysisId, updates) {
+  const useMongo = mongoose.connection.readyState === 1 && mongoose.Types.ObjectId.isValid(analysisId);
+
+  if (useMongo) {
+    try {
+      return await AnalysisResult.findByIdAndUpdate(analysisId, updates, { new: true });
+    } catch (err) {
+      logger.warn(`Mongo update failed for ${analysisId}: ${err.message}`);
+    }
+  }
+
+  return updateAnalysisResult(analysisId, updates);
+}
 
 const worker = new Worker(
   'seoQueue',
@@ -42,8 +66,7 @@ const worker = new Worker(
     try {
       const report = await analyzeUrl(url);
 
-      // Update the existing document with full report and scores
-      await AnalysisResult.findByIdAndUpdate(analysisId, {
+      await persistResult(analysisId, {
         status: 'completed',
         errorMessage: '',
         ...report,
@@ -52,14 +75,20 @@ const worker = new Worker(
       logger.info(`SEO job ${job.id} completed`);
     } catch (err) {
       logger.error(`SEO job ${job.id} failed: ${err.message}`);
-      await AnalysisResult.findByIdAndUpdate(analysisId, {
+      await persistResult(analysisId, {
+        status: 'failed',
         errorMessage: err.message,
       });
-      // Re‑throw to let BullMQ capture the failure (will be retried per job options)
       throw err;
     }
   },
-  { connection, concurrency: 1 }
+  {
+    connection,
+    concurrency: 1,
+    lockDuration: 10 * 60 * 1000,
+    stalledInterval: 60 * 1000,
+    maxStalledCount: 2,
+  }
 );
 
 worker.on('completed', (job) => {
@@ -68,7 +97,7 @@ worker.on('completed', (job) => {
 
 worker.on('failed', async (job, err) => {
   logger.error(`Job ${job.id} failed with error: ${err.message}`);
-  await AnalysisResult.findByIdAndUpdate(job.data.analysisId, {
+  await persistResult(job.data.analysisId, {
     status: 'failed',
     errorMessage: err.message,
   });
